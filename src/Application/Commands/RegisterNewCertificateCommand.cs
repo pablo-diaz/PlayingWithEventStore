@@ -42,14 +42,14 @@ namespace Application.Commands
                     return Result.Failure<RegisterNewCertificateResultDTO>(newCertificateResult.Error);
 
                 await _store.AppendEvent(aggregateToAppend: newCertificateResult.Value,
-                    @event: CreateEvent(newCertificateResult.Value));
+                    @event: CreateEventToStore(newCertificateResult.Value));
 
                 return new RegisterNewCertificateResultDTO {
                     Id = newCertificateResult.Value.Id.ToString()
                 };
             }
 
-            private NewCertificateHasBeenRegistered CreateEvent(Certificate forRegisteredCertificate) =>
+            private NewCertificateHasBeenRegistered CreateEventToStore(Certificate forRegisteredCertificate) =>
                 new NewCertificateHasBeenRegistered {
                     Number = forRegisteredCertificate.Number
                 };

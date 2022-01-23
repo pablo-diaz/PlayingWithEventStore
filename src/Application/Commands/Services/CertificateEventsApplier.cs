@@ -16,18 +16,38 @@ namespace Application.Commands.Services
         {
             var result = Maybe<Certificate>.None;
             foreach (var (eventType, serializedData) in events)
-            {
-                if (eventType == NewCertificateHasBeenRegistered.ApplicationEventTypeName)
-                {
-                    var eventData = new NewCertificateHasBeenRegistered()
-                        .Deserialize<NewCertificateHasBeenRegistered>(serializedData);
-
-                    result = Certificate.Create(withNumber: eventData.Number).Value;
-                    result.Value.SetEntityId(withId);
-                }
-            }
+                result = Apply(result, withId, eventType, serializedData);
 
             return result;
+        }
+
+        private static Certificate Apply(Maybe<Certificate> maybeCertificate, Guid withId, string eventType, string serializedData)
+        {
+            if (eventType == NewCertificateHasBeenRegistered.ApplicationEventTypeName)
+                return New(serializedData, withId);
+
+            if (eventType == CertificateHasBeenSigned.ApplicationEventTypeName)
+                return Sign(maybeCertificate.Value, serializedData);
+
+            throw new NotImplementedException($"Unknown Event Type: {eventType}");
+        }
+
+        private static Certificate New(string fromSerializedData, Guid withId)
+        {
+            var eventData = EventInStore.Deserialize<NewCertificateHasBeenRegistered>(fromSerializedData);
+
+            var certificate = Certificate.Create(withNumber: eventData.Number).Value;
+            certificate.SetEntityId(withId);
+
+            return certificate;
+        }
+
+        private static Certificate Sign(Certificate certificateToSign, string fromSerializedData)
+        {
+            var eventData = EventInStore.Deserialize<CertificateHasBeenSigned>(fromSerializedData);
+            certificateToSign.Sign(Audit.Create(at: eventData.SignedAt, by: eventData.SignedBy).Value);
+
+            return certificateToSign;
         }
     }
 }

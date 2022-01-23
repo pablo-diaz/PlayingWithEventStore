@@ -1,6 +1,6 @@
 ﻿namespace Application.Commands.StoreEvents
 {
-    public sealed class NewCertificateHasBeenRegistered: StoreEvent
+    public sealed class NewCertificateHasBeenRegistered: EventInStore
     {
         internal static readonly string ApplicationEventTypeName = "NewCertificateHasBeenRegistered";
 

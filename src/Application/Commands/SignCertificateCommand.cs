@@ -6,6 +6,7 @@ using Domain;
 
 using Application.Utils;
 using Application.Commands.Services;
+using Application.Commands.StoreEvents;
 
 using MediatR;
 
@@ -41,7 +42,14 @@ namespace Application.Commands
                 if (maybeCertificate.HasNoValue)
                     return Result.Failure("Certificate has not been found");
 
-                return SignCertificate(maybeCertificate.Value, request._signedBy);
+                var signatureResult = SignCertificate(maybeCertificate.Value, request._signedBy);
+                if (signatureResult.IsFailure)
+                    return signatureResult;
+
+                await _store.AppendEvent(aggregateToAppend: maybeCertificate.Value,
+                    @event: CreateEventToStore(maybeCertificate.Value));
+
+                return Result.Success();
             }
 
             private Result SignCertificate(Certificate certificate, string signedBy)
@@ -56,6 +64,12 @@ namespace Application.Commands
 
                 return Result.Success();
             }
+
+            private CertificateHasBeenSigned CreateEventToStore(Certificate forSignedCertificate) =>
+                new CertificateHasBeenSigned {
+                    SignedAt = forSignedCertificate.SignedAudit.Value.At,
+                    SignedBy = forSignedCertificate.SignedAudit.Value.By
+                };
         }
     }
 }

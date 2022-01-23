@@ -29,19 +29,27 @@ namespace Infrastructure.Persistence
         protected override async Task<List<(string eventType, string serializedData)>> LoadEventsAsync(
             string fromStreamName, CancellationToken cancellationToken)
         {
-            var streamResult = _eventStoreClient.ReadStreamAsync(Direction.Forwards, fromStreamName,
-                StreamPosition.Start, cancellationToken: cancellationToken);
-
             var results = new List<(string eventType, string serializedData)>();
-            await foreach(var result in streamResult)
-            {
-                results.Add((
-                    eventType: result.Event.EventType,
-                    serializedData: JsonSerializer.Deserialize<string>(result.Event.Data.ToArray())
-                ));
-            }
 
-            return results;
+            try
+            {
+                var streamResult = _eventStoreClient.ReadStreamAsync(Direction.Forwards, fromStreamName,
+                    StreamPosition.Start, cancellationToken: cancellationToken);
+
+                await foreach(var result in streamResult)
+                {
+                    results.Add((
+                        eventType: result.Event.EventType,
+                        serializedData: JsonSerializer.Deserialize<string>(result.Event.Data.ToArray())
+                    ));
+                }
+
+                return results;
+            }
+            catch (StreamNotFoundException)
+            {
+                return results;
+            }
         }
     }
 }

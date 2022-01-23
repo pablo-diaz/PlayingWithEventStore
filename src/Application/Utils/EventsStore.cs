@@ -14,7 +14,7 @@ namespace Application.Utils
 {
     public abstract class EventsStore
     {
-        internal Task AppendEvent<T>(T aggregateToAppend, StoreEvent @event,
+        internal Task AppendEvent<T>(T aggregateToAppend, EventInStore @event,
                 CancellationToken cancellationToken = new CancellationToken()) where T : AggregateRoot =>
             SaveAsync(streamName: BuildStreamName<T>(aggregateToAppend.Id), @event.ApplicationEventType,
                 currentVersion: 1, @event.Serialize(), cancellationToken);
