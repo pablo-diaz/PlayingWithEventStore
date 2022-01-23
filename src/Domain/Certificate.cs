@@ -37,17 +37,13 @@ namespace Domain
 
         #region Behaviour
 
-        public Result Sign(DateTimeOffset at, string by)
+        public Result Sign(Audit signatureAudit)
         {
             if (Status != CertificateStatus.DRAFT)
                 return Result.Failure("Certificate cannot be Signed, because it is not in the right status");
 
-            var signAuditResult = Audit.Create(at, by);
-            if (signAuditResult.IsFailure)
-                return signAuditResult;
-
             Status = CertificateStatus.SIGNED;
-            SignedAudit = signAuditResult.Value;
+            SignedAudit = signatureAudit;
 
             return Result.Success();
         }

@@ -16,7 +16,7 @@ namespace Domain
             By = by;
         }
 
-        internal static Result<Audit> Create(DateTimeOffset at, string by) =>
+        public static Result<Audit> Create(DateTimeOffset at, string by) =>
             new Audit(at, by);
 
         protected override IEnumerable<object> GetEqualityComponents()

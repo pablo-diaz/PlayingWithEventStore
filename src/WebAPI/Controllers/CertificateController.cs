@@ -24,9 +24,17 @@ namespace WebAPI.Controllers
         public async Task<IActionResult> RegisterNewCertificate([FromBody] RegisterNewCertificateDTO info) =>
             FromResult(await Mediator.Send(info.ToCommand()));
 
+        [HttpPost("{id}/signature")]
+        public async Task<IActionResult> SignCertificate(string id, [FromBody] SignCertificateDTO info) =>
+            FromResult(await Mediator.Send(info.ToCommand(id)));
+
         #region Helpers
+
         private IActionResult Ok<T>(T result) =>
             base.Ok(Envelope.Ok(result));
+
+        protected new IActionResult Ok() =>
+            base.Ok(Envelope.Ok());
 
         private IActionResult Error(string errorMessage) =>
             BadRequest(Envelope.Error(errorMessage));
@@ -38,6 +46,9 @@ namespace WebAPI.Controllers
 
             return Ok(result.Value);
         }
+
+        protected IActionResult FromResult(Result result) =>
+            result.IsSuccess ? Ok() : Error(result.Error);
 
         #endregion
     }

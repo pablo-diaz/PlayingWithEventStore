@@ -1,5 +1,4 @@
-﻿using System;
-using System.Threading;
+﻿using System.Threading;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -7,7 +6,6 @@ using System.Collections.Generic;
 using Application.Utils;
 
 using EventStore.Client;
-
 
 namespace Infrastructure.Persistence
 {
@@ -21,16 +19,29 @@ namespace Infrastructure.Persistence
         }
 
         protected override async Task SaveAsync(string streamName, string eventType,
-            int currentVersion, string serializedEventData, CancellationToken cancellationToken)
+            int currentVersion, string serializedData, CancellationToken cancellationToken)
         {
             await _eventStoreClient.AppendToStreamAsync(streamName, StreamState.Any, new[] {
-                new EventData(Uuid.NewUuid(), eventType, JsonSerializer.SerializeToUtf8Bytes(serializedEventData))
+                new EventData(Uuid.NewUuid(), eventType, JsonSerializer.SerializeToUtf8Bytes(serializedData))
             }, cancellationToken: cancellationToken);
         }
 
-        protected override Task<IEnumerable<string>> LoadEventsAsync(CancellationToken cancellationToken)
+        protected override async Task<List<(string eventType, string serializedData)>> LoadEventsAsync(
+            string fromStreamName, CancellationToken cancellationToken)
         {
-            throw new NotImplementedException();
+            var streamResult = _eventStoreClient.ReadStreamAsync(Direction.Forwards, fromStreamName,
+                StreamPosition.Start, cancellationToken: cancellationToken);
+
+            var results = new List<(string eventType, string serializedData)>();
+            await foreach(var result in streamResult)
+            {
+                results.Add((
+                    eventType: result.Event.EventType,
+                    serializedData: JsonSerializer.Deserialize<string>(result.Event.Data.ToArray())
+                ));
+            }
+
+            return results;
         }
     }
 }

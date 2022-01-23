@@ -5,6 +5,7 @@ using Domain;
 
 using Application.Utils;
 using Application.Commands.DTOs;
+using Application.Commands.StoreEvents;
 
 using MediatR;
 
@@ -41,19 +42,17 @@ namespace Application.Commands
                     return Result.Failure<RegisterNewCertificateResultDTO>(newCertificateResult.Error);
 
                 await _store.AppendEvent(aggregateToAppend: newCertificateResult.Value,
-                    eventType: "NewCertificateHasBeenRegistered",
-                    serializedEventData: CreateEvent(newCertificateResult.Value));
+                    @event: CreateEvent(newCertificateResult.Value));
 
                 return new RegisterNewCertificateResultDTO {
                     Id = newCertificateResult.Value.Id.ToString()
                 };
             }
 
-            private string CreateEvent(Certificate forRegisteredCertificate) =>
-                JsonConvert.SerializeObject(new {
-                    ApplicationEventVersion = 1,
-                    forRegisteredCertificate.Number
-                });
+            private NewCertificateHasBeenRegistered CreateEvent(Certificate forRegisteredCertificate) =>
+                new NewCertificateHasBeenRegistered {
+                    Number = forRegisteredCertificate.Number
+                };
         }
     }
 }
