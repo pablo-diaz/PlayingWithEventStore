@@ -1,5 +1,8 @@
 using Application.Utils;
 
+using Infrastructure.Utils;
+using Infrastructure.ConfigDTOs;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 
@@ -20,8 +23,12 @@ namespace WebAPI
 
         public void ConfigureServices(IServiceCollection services)
         {
+            AddConfigurationOptions(services);
+
             services.AddControllers();
+
             services.AddApplication();
+            services.AddInfrastructure();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -38,6 +45,11 @@ namespace WebAPI
             app.UseEndpoints(endpoints => {
                 endpoints.MapControllers();
             });
+        }
+
+        private void AddConfigurationOptions(IServiceCollection services)
+        {
+            services.AddOptions<EventStoreDBOptions>().Bind(Configuration.GetSection("EventStoreDbConfig"));
         }
     }
 }

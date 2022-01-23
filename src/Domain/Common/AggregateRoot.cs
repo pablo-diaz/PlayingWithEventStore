@@ -1,10 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 using CSharpFunctionalExtensions;
 
 namespace Domain.Common
 {
-    public abstract class AggregateRoot : Entity<string>
+    public abstract class AggregateRoot : Entity<Guid>
     {
         private readonly List<IDomainEvent> _domainEvents = new List<IDomainEvent>();
         public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents;

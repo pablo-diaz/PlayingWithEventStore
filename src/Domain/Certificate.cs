@@ -16,7 +16,7 @@ namespace Domain
 
         private Certificate(string number)
         {
-            Id = Guid.NewGuid().ToString();
+            Id = Guid.NewGuid();
             Number = number;
         }
 

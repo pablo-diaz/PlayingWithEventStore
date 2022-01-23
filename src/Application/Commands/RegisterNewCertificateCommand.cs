@@ -3,9 +3,12 @@ using System.Threading.Tasks;
 
 using Domain;
 
+using Application.Utils;
 using Application.Commands.DTOs;
 
 using MediatR;
+
+using Newtonsoft.Json;
 
 using CSharpFunctionalExtensions;
 
@@ -23,16 +26,34 @@ namespace Application.Commands
         internal sealed class RegisterNewCertificateCommandHandler :
             IRequestHandler<RegisterNewCertificateCommand, Result<RegisterNewCertificateResultDTO>>
         {
-            public Task<Result<RegisterNewCertificateResultDTO>> Handle(
+            private readonly EventsStore _store;
+
+            public RegisterNewCertificateCommandHandler(EventsStore store)
+            {
+                this._store = store;
+            }
+
+            public async Task<Result<RegisterNewCertificateResultDTO>> Handle(
                 RegisterNewCertificateCommand request, CancellationToken cancellationToken)
             {
                 var newCertificateResult = Certificate.Create(withNumber: request._certNumber);
-                return newCertificateResult.IsFailure
-                    ? Task.FromResult(Result.Failure<RegisterNewCertificateResultDTO>(newCertificateResult.Error))
-                    : Task.FromResult(Result.Success(new RegisterNewCertificateResultDTO {
-                        Id = newCertificateResult.Value.Id
-                    }));
+                if (newCertificateResult.IsFailure)
+                    return Result.Failure<RegisterNewCertificateResultDTO>(newCertificateResult.Error);
+
+                await _store.AppendEvent(aggregateToAppend: newCertificateResult.Value,
+                    eventType: "NewCertificateHasBeenRegistered",
+                    serializedEventData: CreateEvent(newCertificateResult.Value));
+
+                return new RegisterNewCertificateResultDTO {
+                    Id = newCertificateResult.Value.Id.ToString()
+                };
             }
+
+            private string CreateEvent(Certificate forRegisteredCertificate) =>
+                JsonConvert.SerializeObject(new {
+                    ApplicationEventVersion = 1,
+                    forRegisteredCertificate.Number
+                });
         }
     }
 }
