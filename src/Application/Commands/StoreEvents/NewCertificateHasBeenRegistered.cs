@@ -2,7 +2,7 @@
 {
     public sealed class NewCertificateHasBeenRegistered: EventInStore
     {
-        internal static readonly string ApplicationEventTypeName = "NewCertificateHasBeenRegistered";
+        public static readonly string ApplicationEventTypeName = "NewCertificateHasBeenRegistered";
 
         public string Number { get; set; }
 
