@@ -2,8 +2,6 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-using Domain;
-
 using WebAPI.Jobs.Common;
 
 using Application.Utils;
@@ -32,13 +30,17 @@ namespace WebAPI.Jobs
 
             using (var scope = this._services.CreateScope())
             {
+                var docStore = scope.ServiceProvider.GetRequiredService<DocumentsStore>();
+
                 return scope.ServiceProvider
                     .GetRequiredService<EventsStore>()
-                    .SubscribeToEventsAsync<Certificate>(ProcessEvent, stoppingToken);
+                    .SubscribeToEventsAsync<Domain.Certificate>((ei, ct) =>
+                        ProcessEvent(docStore, ei, ct), stoppingToken);
             }
         }
         
-        private Task ProcessEvent(EventInformation<Certificate> eventInfo, CancellationToken cancellationToken)
+        private Task ProcessEvent(DocumentsStore withDocStore,
+            EventInformation<Domain.Certificate> eventInfo, CancellationToken cancellationToken)
         {
             _logger.LogInformation($"\tNew Certificate event received: {eventInfo.Type}");
 
@@ -49,24 +51,42 @@ namespace WebAPI.Jobs
             }
 
             return eventInfo.MaybeParsedEvent.Value.Data switch {
-                NewCertificateHasBeenRegistered @new => ProcessEvent(eventInfo.MaybeParsedEvent.Value.Id, @new),
-                CertificateHasBeenSigned signed => ProcessEvent(eventInfo.MaybeParsedEvent.Value.Id, signed),
+                NewCertificateHasBeenRegistered @new =>
+                    ProcessEvent(withDocStore, eventInfo.MaybeParsedEvent.Value.Id, @new, cancellationToken),
+                CertificateHasBeenSigned signed =>
+                    ProcessEvent(withDocStore, eventInfo.MaybeParsedEvent.Value.Id, signed, cancellationToken),
                 _ => LogNotExistingHandlerForEvent(eventInfo.Type, eventInfo.OriginalId)
             };
         }
 
-        private Task ProcessEvent(Guid withId, NewCertificateHasBeenRegistered @event)
+        private Task ProcessEvent(DocumentsStore withDocStore, Guid withId,
+            NewCertificateHasBeenRegistered @event, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Processing NewCertificateHasBeenRegistered event");
 
-            return Task.CompletedTask;
+            var doc = new Application.Queries.Documents.Certificate {
+                Id = withId.ToString(),
+                Number = @event.Number,
+                Status = "Draft"
+            };
+
+            return withDocStore.SaveAsync(doc, cancellationToken);
         }
 
-        private Task ProcessEvent(Guid withId, CertificateHasBeenSigned @event)
+        private Task ProcessEvent(DocumentsStore withDocStore, Guid withId,
+            CertificateHasBeenSigned @event, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Processing CertificateHasBeenSigned event");
 
-            return Task.CompletedTask;
+            var doc = new Application.Queries.Documents.Certificate
+            {
+                Id = withId.ToString(),
+                Status = "Signed",
+                SignedAt = @event.SignedAt.ToString(),
+                SignedBy = @event.SignedBy
+            };
+
+            return withDocStore.SaveAsync(doc, cancellationToken);
         }
 
         private Task LogNotExistingHandlerForEvent(string forEventType, string forEventId)

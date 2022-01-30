@@ -20,6 +20,7 @@ namespace Infrastructure.Utils
             });
 
             services.AddScoped<EventsStore, EventsStoreDBImpl>();
+            services.AddSingleton<DocumentsStore, ElasticSearchDocumentsStore>();
 
             return services;
         }
