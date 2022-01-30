@@ -3,6 +3,9 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
+using Domain;
+using Domain.Common;
+
 using CSharpFunctionalExtensions;
 
 namespace Application.Utils
@@ -27,6 +30,14 @@ namespace Application.Utils
                 .Where(a => Regex.IsMatch(a.Name, $"\\A<{nameof(Entity.Id)}>k__BackingField\\Z"))
                 .FirstOrDefault()
                 .SetValue(entity, idToSet);
+        }
+
+        internal static string GetStreamPrefix<T>() where T : AggregateRoot
+        {
+            var requestedType = typeof(T);
+            if (requestedType == typeof(Certificate)) return $"Certificate-";
+
+            throw new NotImplementedException("Unknown Aggregate");
         }
     }
 }

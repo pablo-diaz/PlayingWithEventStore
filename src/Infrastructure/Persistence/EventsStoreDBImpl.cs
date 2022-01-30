@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -6,6 +7,8 @@ using System.Collections.Generic;
 using Application.Utils;
 
 using EventStore.Client;
+
+using CSharpFunctionalExtensions;
 
 namespace Infrastructure.Persistence
 {
@@ -50,6 +53,29 @@ namespace Infrastructure.Persistence
             {
                 return results;
             }
+        }
+
+        protected override Task SubscribeToEventsAsync(string eventPrefix,
+                Action<string, string, Maybe<string>> callbackFn,
+                CancellationToken cancellationToken) =>
+            _eventStoreClient.SubscribeToAllAsync((ss, re, ct) => ProcessEvent(re, callbackFn),
+                filterOptions: new SubscriptionFilterOptions(StreamFilter.Prefix(eventPrefix)),
+                cancellationToken: cancellationToken);
+
+        private Task ProcessEvent(ResolvedEvent resolvedEvent, Action<string, string, Maybe<string>> callbackFn)
+        {
+            var serializedContent = Maybe<string>.None;
+
+            try {
+                serializedContent = JsonSerializer.Deserialize<string>(resolvedEvent.Event.Data.ToArray());
+            }
+            catch {
+                serializedContent = Maybe<string>.None;
+            }
+
+            callbackFn(resolvedEvent.Event.EventStreamId, resolvedEvent.Event.EventType, serializedContent);
+
+            return Task.CompletedTask;
         }
     }
 }

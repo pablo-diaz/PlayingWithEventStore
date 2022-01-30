@@ -14,7 +14,7 @@ namespace Application.Commands.StoreEvents
         internal string Serialize() =>
             JsonConvert.SerializeObject(this);
 
-        public static T Deserialize<T>(string serializedData) where T: EventInStore, new() =>
+        internal static T Deserialize<T>(string serializedData) where T: EventInStore, new() =>
             JsonConvert.DeserializeObject<T>(serializedData);
     }
 }

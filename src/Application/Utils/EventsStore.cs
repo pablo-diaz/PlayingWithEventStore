@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
-using Domain;
 using Domain.Common;
 
 using Application.Commands.StoreEvents;
@@ -30,12 +29,18 @@ namespace Application.Utils
         protected abstract Task<List<(string eventType, string serializedData)>> LoadEventsAsync(
             string fromStreamName, CancellationToken cancellationToken);
 
-        private string BuildStreamName<T>(Guid forId) where T : AggregateRoot
-        {
-            var requestedType = typeof(T);
-            if (requestedType == typeof(Certificate)) return $"Certificate-{forId}";
+        protected abstract Task SubscribeToEventsAsync(string eventPrefix,
+            Action<string, string, Maybe<string>> callbackFn,
+            CancellationToken cancellationToken);
 
-            throw new NotImplementedException("Unknown Aggregate");
-        }
+        public Task SubscribeToEventsAsync<T>(Func<EventInformation<T>, CancellationToken, Task> callbackFn,
+                CancellationToken cancellationToken) where T : AggregateRoot =>
+            SubscribeToEventsAsync(Utilities.GetStreamPrefix<T>(),
+                async (originalId, eventType, maybeSerializedData) => {
+                    await callbackFn(new EventInformation<T>(originalId, eventType, maybeSerializedData), cancellationToken);
+            }, cancellationToken);
+
+        private string BuildStreamName<T>(Guid forId) where T : AggregateRoot =>
+            $"{Utilities.GetStreamPrefix<T>()}{forId}";
     }
 }
