@@ -19,6 +19,7 @@ namespace Infrastructure.Persistence
         private readonly ElasticClient _elasticSearchClient;
 
         public ElasticSearchDocumentsStore(IOptions<ElasticSearchOptions> options)
+            :base(options.Value.ApplicationNamePrefix)
         {
             _elasticSearchClient = new ElasticClient(new System.Uri(options.Value.ServiceURL));
         }
@@ -31,7 +32,7 @@ namespace Infrastructure.Persistence
         protected override async Task<Maybe<T>> GetByIdAsync<T>(string documentIdToSearch,
             string documentsName, CancellationToken cancellationToken)
         {
-            var result = await _elasticSearchClient.SearchAsync<T>(s => s.Query(q =>
+            var result = await _elasticSearchClient.SearchAsync<T>(s => s.Index(documentsName).Query(q =>
                 q.Bool(b =>
                     b.Must(ms =>
                         ms.Match(ma =>

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 using WebAPI.Jobs.Common;
 
@@ -16,6 +17,9 @@ namespace WebAPI.Jobs
     {
         private readonly ILogger<CertificateEventsSubscription> _logger;
         private readonly IServiceProvider _services;
+
+        private readonly Dictionary<Guid, Application.Queries.Documents.Certificate> _localCertificatesCache =
+            new Dictionary<Guid, Application.Queries.Documents.Certificate>();
 
         public CertificateEventsSubscription(ILogger<CertificateEventsSubscription> logger,
             IServiceProvider services)
@@ -42,8 +46,6 @@ namespace WebAPI.Jobs
         private Task ProcessEvent(DocumentsStore withDocStore,
             EventInformation<Domain.Certificate> eventInfo, CancellationToken cancellationToken)
         {
-            _logger.LogInformation($"\tNew Certificate event received: {eventInfo.Type}");
-
             if (eventInfo.MaybeParsedEvent.HasNoValue)
             {
                 _logger.LogInformation($"Event {eventInfo.OriginalId} could not be parsed");
@@ -59,34 +61,32 @@ namespace WebAPI.Jobs
             };
         }
 
-        private Task ProcessEvent(DocumentsStore withDocStore, Guid withId,
+        private async Task ProcessEvent(DocumentsStore withDocStore, Guid withId,
             NewCertificateHasBeenRegistered @event, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Processing NewCertificateHasBeenRegistered event");
 
-            var doc = new Application.Queries.Documents.Certificate {
-                Id = withId.ToString(),
-                Number = @event.Number,
-                Status = "Draft"
-            };
+            var existingCertificate = await GetCertificateFromCache(withId, withDocStore, cancellationToken);
 
-            return withDocStore.SaveAsync(doc, cancellationToken);
+            existingCertificate.Id = withId.ToString();
+            existingCertificate.Number = @event.Number;
+            existingCertificate.Status = "Draft";
+
+            await SaveIntoReadModelAsync(withDocStore, withId, existingCertificate, cancellationToken);
         }
 
-        private Task ProcessEvent(DocumentsStore withDocStore, Guid withId,
+        private async Task ProcessEvent(DocumentsStore withDocStore, Guid withId,
             CertificateHasBeenSigned @event, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Processing CertificateHasBeenSigned event");
 
-            var doc = new Application.Queries.Documents.Certificate
-            {
-                Id = withId.ToString(),
-                Status = "Signed",
-                SignedAt = @event.SignedAt.ToString(),
-                SignedBy = @event.SignedBy
-            };
+            var existingCertificate = await GetCertificateFromCache(withId, withDocStore, cancellationToken);
 
-            return withDocStore.SaveAsync(doc, cancellationToken);
+            existingCertificate.Status = "Signed";
+            existingCertificate.SignedAt = @event.SignedAt.ToString();
+            existingCertificate.SignedBy = @event.SignedBy;
+
+            await SaveIntoReadModelAsync(withDocStore, withId, existingCertificate, cancellationToken);
         }
 
         private Task LogNotExistingHandlerForEvent(string forEventType, string forEventId)
@@ -94,6 +94,37 @@ namespace WebAPI.Jobs
             _logger.LogInformation($"Event handler for {forEventType} has not been implemented yet; event id is: {forEventId}");
 
             return Task.CompletedTask;
+        }
+
+        private async Task<Application.Queries.Documents.Certificate> GetCertificateFromCache(
+            Guid withId, DocumentsStore fromDocStore, CancellationToken cancellationToken)
+        {
+            if (_localCertificatesCache.ContainsKey(withId))
+                return _localCertificatesCache[withId];
+
+            var maybeDoc = await fromDocStore.GetByIdAsync<Application.Queries.Documents.Certificate>(withId.ToString(), cancellationToken);
+            if(maybeDoc.HasValue)
+            {
+                _localCertificatesCache[withId] = maybeDoc.Value;
+                return maybeDoc.Value;
+            }
+
+            var @new = new Application.Queries.Documents.Certificate();
+            _localCertificatesCache[withId] = @new;
+            return @new;
+        }
+
+        private void SaveCertificateInCache(Application.Queries.Documents.Certificate certificate, Guid withId)
+        {
+            _localCertificatesCache[withId] = certificate;
+        }
+
+        private async Task SaveIntoReadModelAsync(DocumentsStore withDocStore, Guid withId,
+            Application.Queries.Documents.Certificate certificateToSave,
+            CancellationToken cancellationToken)
+        {
+            await withDocStore.SaveAsync(certificateToSave, cancellationToken);
+            SaveCertificateInCache(certificateToSave, withId);
         }
     }
 }

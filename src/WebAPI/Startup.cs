@@ -50,6 +50,7 @@ namespace WebAPI
         private void AddConfigurationOptions(IServiceCollection services)
         {
             services.AddOptions<EventStoreDBOptions>().Bind(Configuration.GetSection("EventStoreDbConfig"));
+            services.AddOptions<ElasticSearchOptions>().Bind(Configuration.GetSection("ElasticSearchConfig"));
         }
     }
 }
