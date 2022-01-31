@@ -56,13 +56,13 @@ namespace Infrastructure.Persistence
         }
 
         protected override Task SubscribeToEventsAsync(string eventPrefix,
-                Action<string, string, Maybe<string>> callbackFn,
+                Func<string, string, Maybe<string>, Task> callbackFn,
                 CancellationToken cancellationToken) =>
             _eventStoreClient.SubscribeToAllAsync((ss, re, ct) => ProcessEvent(re, callbackFn),
                 filterOptions: new SubscriptionFilterOptions(StreamFilter.Prefix(eventPrefix)),
                 cancellationToken: cancellationToken);
 
-        private Task ProcessEvent(ResolvedEvent resolvedEvent, Action<string, string, Maybe<string>> callbackFn)
+        private async Task ProcessEvent(ResolvedEvent resolvedEvent, Func<string, string, Maybe<string>, Task> callbackFn)
         {
             var serializedContent = Maybe<string>.None;
 
@@ -73,9 +73,7 @@ namespace Infrastructure.Persistence
                 serializedContent = Maybe<string>.None;
             }
 
-            callbackFn(resolvedEvent.Event.EventStreamId, resolvedEvent.Event.EventType, serializedContent);
-
-            return Task.CompletedTask;
+            await callbackFn(resolvedEvent.Event.EventStreamId, resolvedEvent.Event.EventType, serializedContent);
         }
     }
 }

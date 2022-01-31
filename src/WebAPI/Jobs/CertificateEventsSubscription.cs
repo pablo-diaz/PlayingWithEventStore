@@ -43,22 +43,24 @@ namespace WebAPI.Jobs
             }
         }
         
-        private Task ProcessEvent(DocumentsStore withDocStore,
+        private async Task ProcessEvent(DocumentsStore withDocStore,
             EventInformation<Domain.Certificate> eventInfo, CancellationToken cancellationToken)
         {
             if (eventInfo.MaybeParsedEvent.HasNoValue)
             {
                 _logger.LogInformation($"Event {eventInfo.OriginalId} could not be parsed");
-                return Task.CompletedTask;
+                return;
             }
 
-            return eventInfo.MaybeParsedEvent.Value.Data switch {
+            var task = eventInfo.MaybeParsedEvent.Value.Data switch {
                 NewCertificateHasBeenRegistered @new =>
                     ProcessEvent(withDocStore, eventInfo.MaybeParsedEvent.Value.Id, @new, cancellationToken),
                 CertificateHasBeenSigned signed =>
                     ProcessEvent(withDocStore, eventInfo.MaybeParsedEvent.Value.Id, signed, cancellationToken),
                 _ => LogNotExistingHandlerForEvent(eventInfo.Type, eventInfo.OriginalId)
             };
+
+            await task;
         }
 
         private async Task ProcessEvent(DocumentsStore withDocStore, Guid withId,
