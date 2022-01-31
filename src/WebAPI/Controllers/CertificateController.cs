@@ -3,6 +3,8 @@
 using WebAPI.Utils;
 using WebAPI.Controllers.DTOs;
 
+using Application.Queries;
+
 using MediatR;
 
 using CSharpFunctionalExtensions;
@@ -28,6 +30,10 @@ namespace WebAPI.Controllers
         public async Task<IActionResult> SignCertificate(string id, [FromBody] SignCertificateDTO info) =>
             FromResult(await Mediator.Send(info.ToCommand(id)));
 
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetCertificateDetails(string id) =>
+            FromMaybeResult(await Mediator.Send(new GetCertificateByIdQuery(id)), "Certificate was not found by the given Id");
+
         #region Helpers
 
         private IActionResult Ok<T>(T result) =>
@@ -49,6 +55,17 @@ namespace WebAPI.Controllers
 
         protected IActionResult FromResult(Result result) =>
             result.IsSuccess ? Ok() : Error(result.Error);
+
+        protected IActionResult FromMaybeResult<T>(Result<Maybe<T>> result, string notFoundMessage)
+        {
+            if (result.IsFailure)
+                return Error(result.Error);
+
+            if (result.Value.HasValue)
+                return Ok(result.Value.Value);
+
+            return NotFound(Envelope.Error(notFoundMessage));
+        }
 
         #endregion
     }
