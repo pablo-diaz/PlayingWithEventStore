@@ -55,14 +55,22 @@ namespace Infrastructure.Persistence
             }
         }
 
-        protected override Task SubscribeToEventsAsync(string eventPrefix,
-                Func<string, string, Maybe<string>, Task> callbackFn,
+        protected override Task SubscribeToEventsAsync(string eventPrefix, EventsStorePosition fromPosition,
+                Func<string, string, Maybe<string>, ulong, Task> callbackFn,
                 CancellationToken cancellationToken) =>
-            _eventStoreClient.SubscribeToAllAsync((ss, re, ct) => ProcessEvent(re, callbackFn),
+            _eventStoreClient.SubscribeToAllAsync(start: CreatePosition(fromPosition),
+                (ss, re, ct) => ProcessEvent(re, callbackFn),
                 filterOptions: new SubscriptionFilterOptions(StreamFilter.Prefix(eventPrefix)),
                 cancellationToken: cancellationToken);
 
-        private async Task ProcessEvent(ResolvedEvent resolvedEvent, Func<string, string, Maybe<string>, Task> callbackFn)
+        private static Position CreatePosition(EventsStorePosition fromPosition) =>
+            fromPosition.IsItFromStart
+            ? Position.Start
+            : fromPosition.IsItFromEnd
+                ? Position.End
+                : new Position(fromPosition.Position.Value, fromPosition.Position.Value);
+
+        private async Task ProcessEvent(ResolvedEvent resolvedEvent, Func<string, string, Maybe<string>, ulong, Task> callbackFn)
         {
             var serializedContent = Maybe<string>.None;
 
@@ -73,7 +81,8 @@ namespace Infrastructure.Persistence
                 serializedContent = Maybe<string>.None;
             }
 
-            await callbackFn(resolvedEvent.Event.EventStreamId, resolvedEvent.Event.EventType, serializedContent);
+            await callbackFn(resolvedEvent.Event.EventStreamId, resolvedEvent.Event.EventType,
+                serializedContent, resolvedEvent.OriginalPosition.Value.CommitPosition);
         }
     }
 }

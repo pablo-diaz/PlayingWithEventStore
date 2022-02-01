@@ -15,6 +15,8 @@ namespace WebAPI.Jobs
 {
     public class CertificateEventsSubscription : BackgroundService
     {
+        private static readonly string _idOfLastPositionDocument = "ffffed39-7238-4d4d-8e36-3dc35204b26a";
+
         private readonly ILogger<CertificateEventsSubscription> _logger;
         private readonly IServiceProvider _services;
 
@@ -28,24 +30,38 @@ namespace WebAPI.Jobs
             _services = services;
         }
 
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("******* Starting CertificateEventsSubscription *******");
 
             using (var scope = this._services.CreateScope())
             {
                 var docStore = scope.ServiceProvider.GetRequiredService<DocumentsStore>();
+                var position = await GetPositionOfLastProcessedEvent(docStore, stoppingToken);
 
-                return scope.ServiceProvider
+                await scope.ServiceProvider
                     .GetRequiredService<EventsStore>()
-                    .SubscribeToEventsAsync<Domain.Certificate>((ei, ct) =>
-                        ProcessEvent(docStore, ei, ct), stoppingToken);
+                    .SubscribeToEventsAsync<Domain.Certificate>(
+                        fromPosition: position,
+                        (ei, pos, ct) => ProcessEachEvent(docStore, pos, ei, ct),
+                        stoppingToken);
             }
         }
-        
+
+        #region Event processors
+
+        private async Task ProcessEachEvent(DocumentsStore withDocStore, ulong eventPosition,
+            EventInformation<Domain.Certificate> eventInfo, CancellationToken cancellationToken)
+        {
+            await ProcessEvent(withDocStore, eventInfo, cancellationToken);
+            await SavePositionOfLastProcessedEvent(eventPosition, withDocStore, cancellationToken);
+        }
+
         private async Task ProcessEvent(DocumentsStore withDocStore,
             EventInformation<Domain.Certificate> eventInfo, CancellationToken cancellationToken)
         {
+            await SavePositionOfLastProcessedEvent(0, withDocStore, cancellationToken);
+
             if (eventInfo.MaybeParsedEvent.HasNoValue)
             {
                 _logger.LogInformation($"Event {eventInfo.OriginalId} could not be parsed");
@@ -91,6 +107,10 @@ namespace WebAPI.Jobs
             await SaveIntoReadModelAsync(withDocStore, withId, existingCertificate, cancellationToken);
         }
 
+        #endregion
+
+        #region Helpers
+
         private Task LogNotExistingHandlerForEvent(string forEventType, string forEventId)
         {
             _logger.LogInformation($"Event handler for {forEventType} has not been implemented yet; event id is: {forEventId}");
@@ -128,5 +148,26 @@ namespace WebAPI.Jobs
             await withDocStore.SaveAsync(certificateToSave, cancellationToken);
             SaveCertificateInCache(certificateToSave, withId);
         }
+
+        private static async Task<EventsStorePosition> GetPositionOfLastProcessedEvent(
+                DocumentsStore withDocStore, CancellationToken cancellationToken)
+        {
+            var maybeLastPosition = await withDocStore
+                .GetByIdAsync<Application.Queries.Documents.PositionOfLastEventRead>(
+                    _idOfLastPositionDocument, cancellationToken);
+
+            return maybeLastPosition.HasValue
+                ? EventsStorePosition.From(maybeLastPosition.Value.Position)
+                : EventsStorePosition.FromStart;
+        }
+
+        private static Task SavePositionOfLastProcessedEvent(ulong lastPosition,
+                DocumentsStore withDocStore, CancellationToken cancellationToken) =>
+            withDocStore.SaveAsync(new Application.Queries.Documents.PositionOfLastEventRead {
+                Id = _idOfLastPositionDocument,
+                Position = lastPosition
+            }, cancellationToken);
+
+        #endregion
     }
 }

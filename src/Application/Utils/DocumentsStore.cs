@@ -34,6 +34,7 @@ namespace Application.Utils
         {
             var type = typeof(T);
             if (type == typeof(Certificate)) return $"{withAppPrefix}-certificates";
+            if (type == typeof(PositionOfLastEventRead)) return $"{withAppPrefix}-last-read-position";
 
             throw new System.NotImplementedException($"Document type '{type}' has not been setup");
         }

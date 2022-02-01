@@ -30,14 +30,16 @@ namespace Application.Utils
             string fromStreamName, CancellationToken cancellationToken);
 
         protected abstract Task SubscribeToEventsAsync(string eventPrefix,
-            Func<string, string, Maybe<string>, Task> callbackFn,
+            EventsStorePosition fromPosition,
+            Func<string, string, Maybe<string>, ulong, Task> callbackFn,
             CancellationToken cancellationToken);
 
-        public Task SubscribeToEventsAsync<T>(Func<EventInformation<T>, CancellationToken, Task> callbackFn,
+        public Task SubscribeToEventsAsync<T>(EventsStorePosition fromPosition,
+                Func<EventInformation<T>, ulong, CancellationToken, Task> callbackFn,
                 CancellationToken cancellationToken) where T : AggregateRoot =>
-            SubscribeToEventsAsync(Utilities.GetStreamPrefix<T>(),
-                (originalId, eventType, maybeSerializedData) =>
-                    callbackFn(new EventInformation<T>(originalId, eventType, maybeSerializedData), cancellationToken),
+            SubscribeToEventsAsync(Utilities.GetStreamPrefix<T>(), fromPosition,
+                (originalId, eventType, maybeSerializedData, eventPosition) =>
+                    callbackFn(new EventInformation<T>(originalId, eventType, maybeSerializedData), eventPosition, cancellationToken),
                 cancellationToken);
 
         private string BuildStreamName<T>(Guid forId) where T : AggregateRoot =>
